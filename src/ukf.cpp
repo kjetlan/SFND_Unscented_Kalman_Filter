@@ -320,4 +320,114 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
    * covariance, P_.
    * You can also calculate the radar NIS, if desired.
    */
+
+  // Input:
+  // z  :: [3 x 1]
+  // P_ :: [5 x 5]
+  // Xsig_pred_ :: [5 x 15]
+
+  // Output:
+  // x_ :: [5 x 1]
+  // P_ :: [5 x 5]
+
+  // set measurement dimension, radar can measure rho, phi, and rho_dot
+  int n_z = 3;
+
+  // incoming radar measurement
+  VectorXd z = meas_package.raw_measurements_;
+
+  // ----------------------------
+  //     PREDICT MEASUREMENT
+  // ----------------------------
+
+  // create matrix for sigma points in measurement space
+  MatrixXd Zsig = MatrixXd(n_z, 2 * n_aug_ + 1);
+
+  // mean predicted measurement
+  VectorXd z_pred = VectorXd(n_z);
+
+  // measurement covariance matrix S
+  MatrixXd S = MatrixXd(n_z, n_z);
+
+  // transform sigma points into measurement space
+  for (int i = 0; i < 2 * n_aug_ + 1; i++) {
+    // Input
+    double px  = Xsig_pred_(0, i);
+    double py  = Xsig_pred_(1, i);
+    double v   = Xsig_pred_(2, i);
+    double psi = Xsig_pred_(3, i);
+
+    // Measurement Model
+    double vx = cos(psi) * v;
+    double vy = sin(psi) * v;
+
+    double rho = sqrt(px * px + py * py);
+    double phi = atan2(py, px);
+    double rho_d = (px * vx + py * vy) / rho;
+
+    // Update Model
+    Zsig(0, i) = rho;
+    Zsig(1, i) = phi;
+    Zsig(2, i) = rho_d;
+  }
+
+  // calculate mean predicted measurement
+  z_pred.setZero();
+  for (int i = 0; i < 2 * n_aug_ + 1; i++) {
+    z_pred += weights_(i) * Zsig.col(i);
+  }
+
+  // calculate innovation covariance matrix S
+  MatrixXd R = MatrixXd(n_z, n_z);
+  R.setZero();
+  R(0, 0) = std_radr_ * std_radr_;
+  R(1, 1) = std_radphi_ * std_radphi_;
+  R(2, 2) = std_radrd_ * std_radrd_;
+
+  S.setZero();
+  for (int i = 0; i < 2 * n_aug_ + 1; i++) {
+    VectorXd z_diff = Zsig.col(i) - z_pred;
+
+    // normalize (phi) angle to (-pi, pi)
+    while (z_diff(1) >  M_PI) z_diff(1) -= 2.0 * M_PI;
+    while (z_diff(1) < -M_PI) z_diff(1) += 2.0 * M_PI;
+
+    S += weights_(i) * z_diff * z_diff.transpose();
+  }
+  S += R;
+
+  // ----------------------------
+  //       UPDATE STATE
+  // ----------------------------
+
+  // create matrix for cross correlation Tc
+  MatrixXd Tc = MatrixXd(n_x_, n_z);
+
+  // calculate cross correlation matrix
+  Tc.setZero();
+  for (int i = 0; i < 2 * n_aug_ + 1; i++) {
+    VectorXd z_diff = Zsig.col(i) - z_pred;
+    // normalize (phi) angle to (-pi, pi)
+    while (z_diff(1) >  M_PI) z_diff(1) -= 2.0 * M_PI;
+    while (z_diff(1) < -M_PI) z_diff(1) += 2.0 * M_PI;
+
+    VectorXd x_diff = Xsig_pred_.col(i) - x_;
+    // normalize (yaw) angle to (-pi, pi)
+    while (x_diff(3) >  M_PI) x_diff(3) -= 2.0 * M_PI;
+    while (x_diff(3) < -M_PI) x_diff(3) += 2.0 * M_PI;
+
+    Tc += weights_(i) * x_diff * z_diff.transpose();
+  }
+
+  // calculate Kalman gain K;
+  MatrixXd K = Tc * S.inverse();
+
+  VectorXd z_diff = z - z_pred;
+  // normalize (phi) angle to (-pi, pi)
+  while (z_diff(1) >  M_PI) z_diff(1) -= 2.0 * M_PI;
+  while (z_diff(1) < -M_PI) z_diff(1) += 2.0 * M_PI;
+
+  // update state mean and covariance matrix
+  x_ = x_ + K * (z_diff);
+  P_ = P_ - K * S * K.transpose();
 }
