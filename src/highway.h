@@ -1,6 +1,8 @@
 /* \author Aaron Brown */
 // Handle logic for creating traffic on highway and animating it
 
+#include <fstream>  // Log data for tuning model parameters
+
 #include "render/render.h"
 #include "sensors/lidar.h"
 #include "tools.h"
@@ -28,6 +30,8 @@ public:
 	// Predict path in the future using UKF
 	double projectedTime = 0;
 	int projectedSteps = 0;
+	// Log data for tuning model parameters and debugging
+	const bool enableDebug = true;
 	// --------------------------------
 
 	Highway(pcl::visualization::PCLVisualizer::Ptr& viewer)
@@ -141,6 +145,39 @@ public:
 				estimate << traffic[i].ukf.x_[0], traffic[i].ukf.x_[1], v1, v2;
 				tools.estimations.push_back(estimate);
 	
+				// Log data for tuning model parameters and debugging
+				if (enableDebug)
+				{
+					std::ofstream log;
+					log.open("car_" + std::to_string(i) + ".csv", std::ios::out | std::ios::app);
+					if (timestamp == 0) {
+						// Print Header
+						log << "Time";
+						log << ",px,py,v,yaw";
+						log << ",g_px,g_py,g_v,g_yaw";
+						log << std::endl;
+					}
+
+					// Timstamp
+					log << timestamp*1e-6;
+
+					// Log Estimated State
+					double e_px  = traffic[i].ukf.x_(0);
+					double e_py  = traffic[i].ukf.x_(1);
+					double e_v   = traffic[i].ukf.x_(2);
+					double e_yaw = traffic[i].ukf.x_(3);
+					log << "," << e_px << "," << e_py << "," << e_v << "," << e_yaw;
+
+					// Log Ground Truth State
+					double g_px  = traffic[i].position.x - egoCar.position.x;
+					double g_py  = traffic[i].position.y - egoCar.position.y;
+					double g_v   = traffic[i].velocity;
+					double g_yaw = traffic[i].angle;
+					log << "," << g_px << "," << g_py << "," << g_v << "," << g_yaw;
+
+					log << std::endl;
+					log.close();
+				}
 			}
 		}
 		viewer->addText("Accuracy - RMSE:", 30, 300, 20, 1, 1, 1, "rmse");
