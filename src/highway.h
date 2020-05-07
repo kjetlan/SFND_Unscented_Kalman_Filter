@@ -155,6 +155,7 @@ public:
 						log << "Time";
 						log << ",px,py,v,yaw";
 						log << ",g_px,g_py,g_v,g_yaw";
+						log << ",radar_nis,laser_nis";
 						log << std::endl;
 					}
 
@@ -174,6 +175,11 @@ public:
 					double g_v   = traffic[i].velocity;
 					double g_yaw = traffic[i].angle;
 					log << "," << g_px << "," << g_py << "," << g_v << "," << g_yaw;
+
+					// Log Measurement NIS (Normalized Innovation Squared)
+					double radar_nis = traffic[i].ukf.radar_nis_;
+					double laser_nis = traffic[i].ukf.laser_nis_;
+					log << "," << radar_nis << "," << laser_nis;
 
 					log << std::endl;
 					log.close();
