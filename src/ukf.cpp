@@ -16,9 +16,19 @@ UKF::UKF() {
 
   // initial state vector
   x_ = VectorXd(5);
+  x_ << 0,
+        0,
+        0,
+        0,
+        0;
 
   // initial covariance matrix
   P_ = MatrixXd(5, 5);
+  P_ << 1, 0, 0, 0, 0,
+        0, 1, 0, 0, 0,
+        0, 0, 1, 0, 0,
+        0, 0, 0, 1, 0,
+        0, 0, 0, 0, 1;
 
   // Process noise standard deviation longitudinal acceleration in m/s^2
   std_a_ = 30;
@@ -54,6 +64,27 @@ UKF::UKF() {
    * TODO: Complete the initialization. See ukf.h for other member properties.
    * Hint: one or more values initialized above might be wildly off...
    */
+  is_initialized_ = false;
+
+  // State dimension
+  n_x_ = 5;
+
+  // Augmented state dimension
+  n_aug_ = 7;
+
+  // Sigma point spreading parameter
+  lambda_ = 3 - n_aug_;
+
+  // initial predicted sigma points matrix
+  Xsig_pred_ = MatrixXd(n_x_, 2 * n_aug_ + 1);
+
+  // set weights
+  weights_ = VectorXd(2 * n_aug_ + 1);
+
+  weights_(0) = lambda_ / (lambda_ + n_aug_);
+  double weight = 0.5 / (lambda_ + n_aug_);
+  for (int i = 1; i < 2 * n_aug_ + 1; i++) {
+    weights_(i) = weight;
 }
 
 UKF::~UKF() {}
