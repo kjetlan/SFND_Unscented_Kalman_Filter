@@ -35,7 +35,7 @@ UKF::UKF() {
 
   // Process noise standard deviation yaw acceleration in rad/s^2
   std_yawdd_ = M_PI/2.0;  // assumes 95% of yaw accelerations are within +/- pi rad/s^2
-  
+
   /**
    * DO NOT MODIFY measurement noise values below.
    * These are provided by the sensor manufacturer.
@@ -85,7 +85,7 @@ UKF::UKF() {
   double weight = 0.5 / (lambda_ + n_aug_);
   for (int i = 1; i < 2 * n_aug_ + 1; i++) {
     weights_(i) = weight;
-}
+  }
 
   // initial radar NIS (Normalized Innovation Squared)
   radar_nis_ = 0;
@@ -146,7 +146,7 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
     }
 
     return;
-}
+  }
 
   if (use_laser_ && meas_package.sensor_type_ == MeasurementPackage::LASER) {
     // predict next state
@@ -216,7 +216,7 @@ void UKF::Prediction(double delta_t) {
   for (int i = 0; i < n_aug_; i++) {
     Xsig_aug.col(i + 1)          = x_aug + sqrt(lambda_ + n_aug_) * A.col(i);
     Xsig_aug.col(i + 1 + n_aug_) = x_aug - sqrt(lambda_ + n_aug_) * A.col(i);
-}
+  }
 
   // ----------------------------
   //    PREDICT SIGMA POINTS
@@ -291,8 +291,8 @@ void UKF::Prediction(double delta_t) {
 
 void UKF::UpdateLidar(MeasurementPackage meas_package) {
   /**
-   * TODO: Complete this function! Use lidar data to update the belief 
-   * about the object's position. Modify the state vector, x_, and 
+   * TODO: Complete this function! Use lidar data to update the belief
+   * about the object's position. Modify the state vector, x_, and
    * covariance, P_.
    * You can also calculate the lidar NIS, if desired.
    */
@@ -352,7 +352,7 @@ void UKF::UpdateLidar(MeasurementPackage meas_package) {
   for (int i = 0; i < 2 * n_aug_ + 1; i++) {
     VectorXd z_diff = Zsig.col(i) - z_pred;
     S += weights_(i) * z_diff * z_diff.transpose();
-}
+  }
   S += R;
 
   // ----------------------------
