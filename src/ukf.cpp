@@ -102,6 +102,119 @@ void UKF::Prediction(double delta_t) {
    * Modify the state vector, x_. Predict sigma points, the state, 
    * and the state covariance matrix.
    */
+
+  // Input:
+  // x_ :: [5 x 1]
+  // P_ :: [5 x 5]
+
+  // Output:
+  // x_ :: [5 x 1]
+  // P_ :: [5 x 5]
+  // Xsig_pred_ :: [5 x 15]
+
+  // ----------------------------
+  //    GENERATE SIGMA POINTS
+  // ----------------------------
+
+  // create augmented mean state vector
+  VectorXd x_aug = VectorXd(n_aug_);
+  x_aug.setZero();
+  x_aug.head(n_x_) = x_;
+  
+  // process noise has zero mean
+  x_aug(n_x_ + 0) = 0;
+  x_aug(n_x_ + 1) = 0;
+
+  // create augmented state covariance matrix
+  MatrixXd P_aug = MatrixXd(n_aug_, n_aug_);
+
+  P_aug.setZero();
+  P_aug.topLeftCorner(n_x_, n_x_) = P_;
+  // process noise covariance
+  P_aug(n_x_ + 0, n_x_ + 0) = std_a_ * std_a_;
+  P_aug(n_x_ + 1, n_x_ + 1) = std_yawdd_ * std_yawdd_;
+
+  // calculate square root of P_aug
+  MatrixXd A = P_aug.llt().matrixL();
+
+  // create augmented sigma point matrix
+  MatrixXd Xsig_aug = MatrixXd(n_aug_, 2 * n_aug_ + 1);
+
+  Xsig_aug.col(0) = x_aug;
+  for (int i = 0; i < n_aug_; i++) {
+    Xsig_aug.col(i + 1)          = x_aug + sqrt(lambda_ + n_aug_) * A.col(i);
+    Xsig_aug.col(i + 1 + n_aug_) = x_aug - sqrt(lambda_ + n_aug_) * A.col(i);
+}
+
+  // ----------------------------
+  //    PREDICT SIGMA POINTS
+  // ----------------------------
+
+  // predict sigma points
+  for (int i = 0; i < 2 * n_aug_ + 1; i++) {
+    double px        = Xsig_aug(0, i);
+    double py        = Xsig_aug(1, i);
+    double v         = Xsig_aug(2, i);
+    double psi       = Xsig_aug(3, i);
+    double psi_d     = Xsig_aug(4, i);
+    double nu_a      = Xsig_aug(5, i);
+    double nu_psi_dd = Xsig_aug(6, i);
+
+    VectorXd x = VectorXd(n_x_);
+    x << px,
+         py,
+         v,
+         psi,
+         psi_d;
+
+    VectorXd s1 = VectorXd(n_x_);
+    double atol = 1e-3;
+    if (fabs(psi_d) > atol) {
+      s1 << v / psi_d * (sin(psi + psi_d * delta_t) - sin(psi)),
+            v / psi_d * (-cos(psi + psi_d * delta_t) + cos(psi)),
+            0,
+            psi_d * delta_t,
+            0;
+    } else {
+      // avoid division by zero
+      s1 << v * cos(psi) * delta_t,
+            v * sin(psi) * delta_t,
+            0,
+            psi_d * delta_t,
+            0;
+    }
+
+    VectorXd s2 = VectorXd(n_x_);
+    s2 << 0.5 * (delta_t * delta_t) * cos(psi) * nu_a,
+          0.5 * (delta_t * delta_t) * sin(psi) * nu_a,
+          delta_t * nu_a,
+          0.5 * (delta_t * delta_t) * nu_psi_dd,
+          delta_t * nu_psi_dd;
+
+    Xsig_pred_.col(i) = x + s1 + s2;
+  }
+
+  // ----------------------------
+  // PREDICT MEAN AND COVARIANCE
+  // ----------------------------
+
+  // predict state mean
+  x_.setZero();
+  for (int i = 0; i < 2 * n_aug_ + 1; i++) {
+    x_ += weights_(i) * Xsig_pred_.col(i);
+  }
+
+  // predict state covariance matrix
+  P_.setZero();
+  for (int i = 0; i < 2 * n_aug_ + 1; i++) {
+    VectorXd x_diff = Xsig_pred_.col(i) - x_;
+
+    // normalize (yaw) angle to (-pi, pi)
+    while (x_diff(3) >  M_PI) x_diff(3) -= 2.0 * M_PI;
+    while (x_diff(3) < -M_PI) x_diff(3) += 2.0 * M_PI;
+
+    P_ += weights_(i) * x_diff * x_diff.transpose();
+  }
 }
 
 void UKF::UpdateLidar(MeasurementPackage meas_package) {
