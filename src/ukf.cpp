@@ -118,7 +118,31 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
     }
     if (meas_package.sensor_type_ == MeasurementPackage::RADAR) {
       VectorXd z = meas_package.raw_measurements_; // rho, phi, rho_dot
+      double rho = z(0);
+      double phi = z(1);
+      double rho_dot = z(2);
+      double px = rho * cos(phi);
+      double py = rho * sin(phi);
 
+      // Assume vehicle is driving forward or backward in straight line,
+      // so that vy ~ 0 and vel_abs ~ vx.
+      // Then we have:
+      // rho_d = (px*vx + py*vy) / rho
+      // rho_d = (px*vx) / rho
+      // vx = (rho_d * rho)/px
+
+      // initialize state vector
+      x_(2) = (rho_dot * rho) / px;  // vel_abs [m/s]    :: assume vy ~ 0
+      x_(3) = 0;                     // yaw_angle [rad]  :: assume straight heading
+      x_(4) = 0;                     // yaw_rate [rad/s] :: assume stable heading
+      
+      // initialize covariance matrix
+      // the values are tuned for the highway scenario,
+      // to fit more scenarios, we may need increase the variances
+      // and rely on the ukf to convergence to appropriate values
+      P_(2, 2) = std_radrd_ * std_radrd_;  // assume guess within +/- 0.6 m/s
+      P_(3, 3) = 0.1 * 0.1;  // assume straight heading +/- 0.2 rad
+      P_(4, 4) = 0.1 * 0.1;  // assume stable heading +/- 0.2 rad/s
     }
 
     return;
