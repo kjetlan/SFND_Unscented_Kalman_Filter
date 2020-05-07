@@ -94,6 +94,47 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
    * TODO: Complete this function! Make sure you switch between lidar and radar
    * measurements.
    */
+  if (!is_initialized_ || meas_package.timestamp_ == 0) {
+    time_us_ = meas_package.timestamp_;
+    is_initialized_ = true;
+
+    if (meas_package.sensor_type_ == MeasurementPackage::LASER) {
+      VectorXd z = meas_package.raw_measurements_; // px, py
+      
+      // initialize state vector
+      x_(0) = z(0);  // px [m]
+      x_(1) = z(1);  // py [m]
+      
+      // initialize covariance matrix
+      P_(0, 0) = std_laspx_ * std_laspx_;
+      P_(1, 1) = std_laspy_ * std_laspy_;
+    }
+    if (meas_package.sensor_type_ == MeasurementPackage::RADAR) {
+      VectorXd z = meas_package.raw_measurements_; // rho, phi, rho_dot
+
+    }
+
+    return;
+}
+
+  if (use_laser_ && meas_package.sensor_type_ == MeasurementPackage::LASER) {
+    // predict next state
+    double delta_t = (meas_package.timestamp_ - time_us_) * 1e-6;
+    Prediction(delta_t);
+    time_us_ = meas_package.timestamp_;
+
+    // update prediction with measurement
+    UpdateLidar(meas_package);
+  }
+  if (use_radar_ && meas_package.sensor_type_ == MeasurementPackage::RADAR) {
+    // predict next state
+    double delta_t = (meas_package.timestamp_ - time_us_) * 1e-6;
+    Prediction(delta_t);
+    time_us_ = meas_package.timestamp_;
+
+    // update prediction with measurement
+    UpdateRadar(meas_package);
+  }
 }
 
 void UKF::Prediction(double delta_t) {
